@@ -50,17 +50,18 @@ type message struct {
 }
 
 func main() {
-	port := "8080"
+	port := "8989"
 	if len(os.Args) != 1 {
 		var err error
 		port, err = portChecker()
 		if err != nil {
-			log.Fatal(err)
+			log.Println("[USAGE]: ./TCPChat $port")
 		}
 	}
+	fmt.Println("TCP Server listening on port:", port)
 	listen, err := net.Listen("tcp", ":"+port)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("[USAGE]: ./TCPChat $port")
 	}
 	defer listen.Close()
 	var mutex sync.Mutex
@@ -99,25 +100,24 @@ func addUser(mutex *sync.Mutex) {
 }
 
 func handle(conn net.Conn, mutex *sync.Mutex) {
-	go addUser(mutex)
 	mutex.Lock()
 	if userCounter >= 10 {
+		mutex.Unlock()
 		fmt.Fprintln(conn, "Number of user is 10, comeback later :)")
 		conn.Close()
 		return
 	}
 	mutex.Unlock()
+	go addUser(mutex)
 	for _, s := range joinMessageForUser {
 		fmt.Fprint(conn, s)
 	}
 	user := userExist(conn, mutex)
-	mutex.Lock()
 	for _, s := range historyOfMessages {
 		for _, historyOfMessagesString := range s {
 			fmt.Fprint(conn, historyOfMessagesString)
 		}
 	}
-	mutex.Unlock()
 	if user != "" {
 		messages <- newMessage(user, " has joined our chat...", conn)
 	}
@@ -125,7 +125,7 @@ func handle(conn net.Conn, mutex *sync.Mutex) {
 	for input.Scan() {
 		messages <- newMessage(user, input.Text(), conn)
 	}
-	// Delete client form map
+	// Delete client from map
 	mutex.Lock()
 	delete(clients, user)
 	userCounter--
